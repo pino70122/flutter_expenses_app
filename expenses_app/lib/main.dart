@@ -7,13 +7,46 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';       // 日付
 import 'package:flutter_localizations/flutter_localizations.dart'; //日本語化
 import 'package:flutter/services.dart';
+import 'package:sqflite/sqflite.dart'; // データベース
+import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // データベース
+import 'package:path/path.dart';
 
+/////////////////////////////////////////////////////////////////////////////////////////////////// データベースの準備
+// データベース操作用の変数
+Database? database;
 
-void main() {
-  //debugPaintSizeEnabled = true;
-  runApp(const MyApp());
+Future<void> initDB() async {
+  // パスを準備
+  String dbPath = await getDatabasesPath();
+  String path = join(dbPath, "expenses_app.db") ;
+
+  // データベースを開く or 作成する
+  database = await openDatabase(
+    path,
+    version: 1,
+    onCreate: (Database db, int version) async {
+      // テーブルを作成
+      await db.execute(
+        "CREATE TABLE Expenses_App ("
+          "id INTEGER PRIMARY KEY, date TEXT, amount INTEGER, category TEXT, memo TEXT)"
+      );
+    } 
+  );
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////// main関数
+void main() async {
+  //debugPaintSizeEnabled = true;
+  // 初期化関連
+  WidgetsFlutterBinding.ensureInitialized();
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+  // DBを開く
+  await initDB();
+  // UIを展開
+  runApp(const MyApp());
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////// MyApp関数
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -29,7 +62,6 @@ class MyApp extends StatelessWidget {
       supportedLocales: [
         const Locale('ja', 'JP'),  // Japanese, Japan
       ],
-
       // レイアウト
       home: Scaffold(
         appBar: AppBar(title: Text("支出入力"),),
@@ -126,8 +158,11 @@ class Input extends StatefulWidget {
   _InputState createState() => _InputState();
 }
 
-//入力欄
+// 入力欄のStateクラス
 class _InputState extends State<Input> {
+  // テキストボックスのコントローラー
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _memoController = TextEditingController();
   // カテゴリーのリスト
   final List<String> cateList = [
     "食費",
@@ -138,16 +173,42 @@ class _InputState extends State<Input> {
   String cateSelect = "食費";
   
   // 今日の日付取得
-  DateTime dateSelect = DateTime.now();
+  DateTime date = DateTime.now();
   // 日付のハンドラー
   void _onDateChange(DateTime newDate) {
     setState(() {
-      dateSelect = newDate;
+      date = newDate;
     });
   }
 
-  @override
+  // 完了ボタンの挙動
+  void _saveData() async {
+    /*
+    await database!.insert("Expenses_App", {
+      "date": DateFormat("yyyy/M/d").format(date),
+      "amount": int.parse(_amountController.text),
+      "category": cateSelect,
+      "memo": _memoController.text,
+      }
+    );
+    */
 
+    // print出力
+    await printDB();
+  }
+
+  // データベース出力
+  Future<void> printDB() async {
+    final Database db = await database!;
+    final List<Map<String, dynamic>> results = await db.query("Expenses_App");
+    print("DBを出力します…");
+    for (var row in results){
+      print(row);
+    }
+  }
+
+  @override
+  //************************************************************************************** ウィジェットビルド
   Widget build(BuildContext context) {
     return 
     Row(
@@ -175,7 +236,7 @@ class _InputState extends State<Input> {
                 children: [            
                     // 金額入力欄
                     TextField(
-                      controller: TextEditingController(),
+                      controller: _amountController,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(),
                         hintText: "金額",
@@ -230,7 +291,7 @@ class _InputState extends State<Input> {
             
                     // メモ欄
                     TextField(
-                      controller: TextEditingController(),
+                      controller: _memoController,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(),
                         //labelText: "金額",
@@ -248,7 +309,7 @@ class _InputState extends State<Input> {
               
                     // 完了ボタン
                     ElevatedButton(
-                      onPressed: (){},
+                      onPressed: _saveData,
                       child: Text("完了"),
                       style: ElevatedButton.styleFrom()
               
@@ -261,52 +322,7 @@ class _InputState extends State<Input> {
 
       // 空白
       SizedBox(width: 200),
-
-      ],
-
-      
-    );
-  }
-}
-
-class TweetTile extends StatelessWidget {
-  const TweetTile({
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding( 
-      padding: const EdgeInsets.all(8.0),
-    
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          
-          CircleAvatar(backgroundImage: AssetImage("assets/profile.jpg"),),
-          
-          SizedBox(width: 8,),
-          
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-    
-              Row(
-                children: [
-                  Text("こんぶ＠Flutter大学"),
-                  SizedBox(width: 8,),
-                  Text("2022/05/05"),
-                ],
-                ),
-                
-              SizedBox(height: 4),
-              Text("最高でした。"),
-              IconButton(onPressed: (){}, icon: Icon(Icons.favorite_border)),
-    
-            ],
-          ),
-        ],
-      ),
+      ],   
     );
   }
 }
