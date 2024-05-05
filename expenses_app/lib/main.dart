@@ -62,15 +62,121 @@ class MyApp extends StatelessWidget {
       supportedLocales: [
         const Locale('ja', 'JP'),  // Japanese, Japan
       ],
+      home: const MainPage(),
       // レイアウト
+      /*
       home: Scaffold(
         appBar: AppBar(title: Text("支出入力"),),
         body: Input(),
-      ));
+      )
+      */
+    );
+  }
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////// ページ遷移クラス
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
+  @override
+  _MainPageState createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  // ページ遷移用のコントローラー
+  final PageController _pageController = PageController();
+  
+  // ページを戻す関数
+  void pageBack() {
+    _pageController.previousPage(
+      duration: Duration(milliseconds: 500),
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
+  // ページを進める関数
+  void pageForward() {
+    _pageController.nextPage(
+      duration: Duration(milliseconds: 500),
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
+  @override
+  //************************************************************************************** ウィジェットビルド
+  Widget build(BuildContext context) {
+    // ページの幅と高さを取得
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+    return Scaffold(
+      body: Stack(
+        children: [
+
+          //------------------------------------------------------------------ ページ
+          PageView(
+            controller: _pageController,
+            children: [
+              // 入力ページ
+              Input(),
+              // グラフページ
+              Center(child: Text("新しいページ")),
+            ],
+          ),
+
+          // 2種類の書き方あり
+          //------------------------------------------------------------------ ページ進むボタン（右）
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: SizedBox(
+              width: screenWidth * 0.1,
+              height: screenHeight,
+              child: IconButton(
+                icon:Opacity(
+                  opacity: 0.0,
+                  child : Icon(Icons.chevron_left, size: 24),
+                ),   // アイコンサイズは適宜調整
+                onPressed: pageForward,
+                style: IconButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                ),
+              ),
+            ),
+          ),
+          //------------------------------------------------------------------ ページ戻るボタン（左） まだ長方形になっていない
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: TextButton(
+              onPressed: pageBack,
+              child: Text(""),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                //onSurface: Colors.transparent,
+                minimumSize: Size(screenWidth * 0.1, screenHeight),
+              )
+            ),
+          ),
+          
+          /*
+          // 戻るボタン（左）
+          Positioned(
+            left: 10,
+            child: IconButton(onPressed: pageBack, icon: const Icon(Icons.chevron_left))
+          ),
+          // 進むボタン（右）
+          Positioned(
+            right: 10,
+            child: IconButton(onPressed: pageForward, icon: const Icon(Icons.chevron_right))
+          ),
+          */
+        ],
+      ),
+    );
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////// カレンダー
+/////////////////////////////////////////////////////////////////////////////////////////////////// Chalenderクラス
 class Calender extends StatefulWidget {
   final Function(DateTime) onDateChange;
   const Calender({super.key, required this.onDateChange});
@@ -116,7 +222,7 @@ class _CalenderState extends State<Calender> {
   }
 
   @override
-
+  //************************************************************************************** ウィジェットビルド
   Widget build(BuildContext context) {
     return
     // ------------------------------------------------------------------ カレンダーの詳細（↓）
@@ -151,7 +257,7 @@ class _CalenderState extends State<Calender> {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////// すべての親
+/////////////////////////////////////////////////////////////////////////////////////////////////// Inputクラス
 class Input extends StatefulWidget {
   const Input({super.key});
   @override
@@ -214,6 +320,7 @@ class _InputState extends State<Input> {
     Row(
       mainAxisAlignment: MainAxisAlignment.center,    // 横軸で中央寄せ      
       children: [
+
         // 空白
         SizedBox(width: 200),
 
@@ -300,7 +407,7 @@ class _InputState extends State<Input> {
                         contentPadding: EdgeInsets.symmetric(vertical: 10) // 上下の隙間
                         ),
                       textAlign: TextAlign.center, //中央揃え
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                      style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500),
                     ),    
             //--------------------------------------------------------------------------------------------------- 中央列のコンテナ（↑）
             
