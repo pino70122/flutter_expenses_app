@@ -1,15 +1,14 @@
-import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';       // 日付
 import 'package:flutter_localizations/flutter_localizations.dart'; //日本語化
-import 'package:flutter/services.dart';
-import 'package:sqflite/sqflite.dart'; // データベース
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // データベース
 import 'package:path/path.dart';
+import 'dart:io' show Platform; // プラットフォームを確認
+import 'package:window_size/window_size.dart'; // ウィンドウのサイズを制限
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////// データベースの準備
 // データベース操作用の変数
@@ -36,13 +35,18 @@ Future<void> initDB() async {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////// main関数
 void main() async {
-  //debugPaintSizeEnabled = true;
+  //debugPaintSizeEnabled = true; // ウィジェットのエッジを見えるようにする
   // 初期化関連
   WidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
   // DBを開く
   await initDB();
+  // ウィンドウのサイズを制限
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    setWindowTitle("Expenses App"); // ウィンドウの名前
+    setWindowMinSize(const Size(800, 600)); // 最小サイズ
+  }
   // UIを展開
   runApp(const MyApp());
 }
@@ -94,10 +98,28 @@ class _MainPageState extends State<MainPage> {
 
   // ページを進める関数
   void pageForward() {
-    _pageController.nextPage(
-      duration: Duration(milliseconds: 500),
-      curve: Curves.fastOutSlowIn,
-    );
+    // 現在のページ数（０スタート）
+    int numPage = _pageController.page!.round();
+    // ページの総数
+    int maxPage = 3;
+
+    // 最初のページへ戻る
+    if (numPage == maxPage -1) {
+      _pageController.animateToPage(
+        0,
+        duration: Duration(milliseconds: 500),
+        curve: Curves.fastOutSlowIn,
+      );
+    }
+    //　次のページへ
+    else {
+      _pageController.nextPage(
+        duration: Duration(milliseconds: 500),
+        curve: Curves.fastOutSlowIn,
+      );
+    }
+
+  
   }
 
   @override
@@ -118,6 +140,7 @@ class _MainPageState extends State<MainPage> {
               Input(),
               // グラフページ
               Center(child: Text("新しいページ")),
+              Center(child: Text("最後のページ")),
             ],
           ),
 
@@ -276,7 +299,41 @@ class _InputState extends State<Input> {
     "医療費"
   ];
   // カテゴリーの初期値
-  String cateSelect = "食費";
+  String? cateSelect = "食費";
+  // カテゴリーを編集する関数
+  void editCateList(BuildContext context) {  
+    showGeneralDialog(
+      context: context,
+      pageBuilder: (BuildContext buildContext, Animation<double> animation, Animation<double> secondaryAnimation) {
+        return Center(
+          child: Container(
+            width: MediaQuery.of(context).size.width - 40,
+            height: MediaQuery.of(context).size.height - 400,
+            padding: EdgeInsets.all(20),
+            color: Colors.white,
+            child: Text("カスタムダイアログ"))
+        );
+      },
+      barrierDismissible: true, // 外側をクリックしたらダイアログを閉じる 
+      barrierColor: Colors.transparent,
+
+      //
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      transitionDuration: const Duration(milliseconds: 400),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOut
+          ),
+          child: child,
+        );
+      }
+    );   
+  }
+
+  
+  
   
   // 今日の日付取得
   DateTime date = DateTime.now();
@@ -289,6 +346,7 @@ class _InputState extends State<Input> {
 
   // 完了ボタンの挙動
   void _saveData() async {
+    // DB書き込み
     /*
     await database!.insert("Expenses_App", {
       "date": DateFormat("yyyy/M/d").format(date),
@@ -334,95 +392,142 @@ class _InputState extends State<Input> {
             // 空白
             SizedBox(height: 32),
 
-            Container(
-              width: 200,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,    // 縦軸で中央寄せ
-                crossAxisAlignment: CrossAxisAlignment.center,  // 横軸で中央寄せ
-              
-                children: [            
-                    // 金額入力欄
-                    TextField(
-                      controller: _amountController,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: "金額",
-                        hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
-                        contentPadding: EdgeInsets.symmetric(vertical: 10) // 上下の隙間
-                        ),
-                      textAlign: TextAlign.center, //中央揃え
-                      style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500),
-                    ),
-            
-                    // 空白
-                    SizedBox(height: 32),
-            
-                    // カテゴリーのドロップダウン
-                    Container(
-                      width: double.infinity, // 横幅を最大に
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey), // ボーダーを追加
-                        borderRadius: BorderRadius.circular(4), // 角を丸くする
-                      ),
-            
-                      child: Row(
-                        children: [
-                          SizedBox(width: 55),
-                          DropdownButtonHideUnderline( //ドロップダウンの線を消す
-                            // ------------------------------------------------------------------ ドロップダウンの詳細（↓）
-                            child: DropdownButton<String>(
-                              value: cateSelect,
-                              items: cateList.map<DropdownMenuItem<String>>(
-                                (String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value, 
-                                    child: Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500))
-                                  );
-                                }
-                              ).toList(),
-                              onChanged: (String? value) {
-                                setState(() {
-                                  cateSelect = value!;
-                                });
-                              },  
+            Row(
+              children: [
+                // 配置の整合性を保つために
+                Text('円', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500, color: Color.fromRGBO(0, 0, 0, 0))),
+                SizedBox(width: 10),
+
+                // 中央列
+                Container(
+                  width: 200,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,    // 縦軸で中央寄せ
+                    crossAxisAlignment: CrossAxisAlignment.center,  // 横軸で中央寄せ
+                  
+                    children: [            
+                        // 金額入力欄
+                        TextField(
+                          controller: _amountController,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: "金額",
+                            hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
+                            contentPadding: EdgeInsets.symmetric(vertical: 10) // 上下の隙間
                             ),
-                            // ------------------------------------------------------------------ ドロップダウンの詳細（↑）
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    // 空白
-                    SizedBox(height: 32),
-            
-                    // メモ欄
-                    TextField(
-                      controller: _memoController,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        //labelText: "金額",
-                        hintText: "メモ",
-                        hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
-                        contentPadding: EdgeInsets.symmetric(vertical: 10) // 上下の隙間
+                          textAlign: TextAlign.center, //中央揃え
+                          style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500),
                         ),
-                      textAlign: TextAlign.center, //中央揃え
-                      style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500),
-                    ),    
-            //--------------------------------------------------------------------------------------------------- 中央列のコンテナ（↑）
-            
-                    // 空白
+                
+                        // 空白
+                        SizedBox(height: 32),
+                
+                        // カテゴリーのドロップダウン
+                        Container(
+                          width: double.infinity, // 横幅を最大に
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey), // ボーダーを追加
+                            borderRadius: BorderRadius.circular(4), // 角を丸くする
+                          ),
+                
+                          child: Row(
+                            children: [
+                              SizedBox(width: 55),
+                              DropdownButtonHideUnderline( //ドロップダウンの線を消す
+                                // ------------------------------------------------------------------ ドロップダウンの詳細（↓）
+                                child: DropdownButton<String>(
+                                  value: cateSelect,
+                                  items: <String>[
+                                    ...cateList,
+                                    "編集"
+                                  ].map<DropdownMenuItem<String>>(
+                                      (String value) {
+                                        return DropdownMenuItem<String>(
+                                          value: value, 
+                                          child: Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
+                                        );
+                                      }
+                                    ).toList(),                      
+                                  onChanged: (String? newValue) { 
+                                    print(newValue);
+                                    if(newValue == "編集") {
+                                      editCateList(context);
+                                    }else{
+                                      setState(() {
+                                        cateSelect = newValue;
+                                      });
+                                    }
+                                  },
+                                  
+
+                                  /*                              
+                                  onChanged: (String? value) {
+                                    if (value == "edit"){
+                                      
+                                      String data = await editCateList(context);
+                                    }
+                                    else{
+                                      setState(() {
+                                        cateSelect = value;
+                                      });
+                                    }
+                                  }, 
+                                  */                             
+                                ),
+                                // ------------------------------------------------------------------ ドロップダウンの詳細（↑）
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // 空白
+                        SizedBox(height: 32),
+                
+                        // メモ欄
+                        TextField(
+                          controller: _memoController,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            //labelText: "金額",
+                            hintText: "メモ",
+                            hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
+                            contentPadding: EdgeInsets.symmetric(vertical: 10) // 上下の隙間
+                            ),
+                          textAlign: TextAlign.center, //中央揃え
+                          style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500),
+                        ),    
+                //--------------------------------------------------------------------------------------------------- 中央列のコンテナ（↑）
+                
+                        // 空白
+                        SizedBox(height: 32),
+                  
+                        // 完了ボタン
+                        ElevatedButton(
+                          onPressed: _saveData,
+                          child: Text("完了"),
+                          style: ElevatedButton.styleFrom()
+                  
+                          ),
+                    ],
+                  ),
+                ),
+                
+                // 空白
+                SizedBox(width: 10),
+                // 円テキスト
+                Column(
+                  children: [
+                    Text('円', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w500)),
+                    SizedBox(height: 30), // 微調整
+                    SizedBox(height: 45),
                     SizedBox(height: 32),
-              
-                    // 完了ボタン
-                    ElevatedButton(
-                      onPressed: _saveData,
-                      child: Text("完了"),
-                      style: ElevatedButton.styleFrom()
-              
-                      ),
-                ],
-              ),
+                    SizedBox(height: 45),
+                    SizedBox(height: 32),
+                    SizedBox(height: 45),
+                  ],
+                )
+              ],
             ),
           ],
         ),
