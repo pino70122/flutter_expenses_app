@@ -1,3 +1,5 @@
+//import 'dart:ffi' as ffi; // C言語を呼ぶ
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';       // 日付
@@ -293,7 +295,7 @@ class _InputState extends State<Input> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _memoController = TextEditingController();
   // カテゴリーのリスト
-  final List<String> cateList = [
+  List<String> cateList = [
     "食費",
     "交通費",
     "医療費"
@@ -311,7 +313,40 @@ class _InputState extends State<Input> {
             height: MediaQuery.of(context).size.height - 400,
             padding: EdgeInsets.all(20),
             color: Colors.white,
-            child: Text("カスタムダイアログ"))
+            child: Column( // ダイアログがの中身 
+              crossAxisAlignment: CrossAxisAlignment.center, 
+              children: cateList.map((item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3.0), // 各テゴリー上下にpadding
+                child: Row(
+                  children: [
+                    Text(
+                      item, 
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w300,
+                        decoration: TextDecoration.none, // アンダーラインなし
+                      ),
+                    ),
+                    IconButton( // カテゴリー削除ボタン
+                      onPressed: (){
+                        setState(() {
+                          cateList.remove(item);
+                          // 消したカテゴリーが選択中のカテゴリーのとき
+                          if (item == cateSelect){ 
+                            //カテゴリーが残っているなら
+                            if (cateList.isNotEmpty) cateSelect = cateList[0]; // 1つ目の要素を選択
+                            // カテゴリーが残っていないなら
+                            else cateSelect = null; // nullを選択                         
+                          }
+                        });
+                      },
+                      icon: Icon(Icons.remove_circle, color: Colors.red),
+                    )
+                  ],
+                ),
+              )).toList(),
+            ))
         );
       },
       barrierDismissible: true, // 外側をクリックしたらダイアログを閉じる 
@@ -319,12 +354,12 @@ class _InputState extends State<Input> {
 
       //
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      transitionDuration: const Duration(milliseconds: 400),
+      transitionDuration: const Duration(milliseconds: 320), // 速度
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
           opacity: CurvedAnimation(
             parent: animation,
-            curve: Curves.easeOut
+            curve: Curves.fastOutSlowIn
           ),
           child: child,
         );
